@@ -1,0 +1,88 @@
+linux_lvmについて
+
+zfsみたいなもの
+HDDを仮想化して扱える。
+細かいやつ固めて大きく！みたいな
+
+
+扱うには以下の概念を知る事
+●PV（Physical Volume、物理ボリューム）
+ 物理のハードディスクを指す。
+ 仮想的に扱う際に指定する
+
+●VG（Volume Group、ボリュームグループ）
+ 仮想化したHDDを複数まとめて一つのHDDに見せかける
+ 
+●LV（Logical Volumes、論理ボリューム）
+ パーティションのようなもの
+
+PV を束ねて VG を作る
+VG の上に LVを切ってディスクとして扱う
+LVをフォーマット(ファイルシステム用意して)して使う
+
+
+やり方
+管理者権限必須
+
+■ 物理ディスクを認識させる
+ 1 物理的にHDD接続 仮想環境ならば良きに計らう
+ 
+ 2 fdisk -l で認識されているデバイスを確認
+   なんかパーティション切られてないやつが居たらそれ
+ 
+ 3 パーティションを切って、使えるようにする
+   fdisk [ディスク名(/dev/sdb)]
+   対話形式でパーティションを切ってい行く
+   
+   「m」でメニュー一覧が見れる
+   今回は「n」で新規パーティションを作成する。
+   「p」で基本領域を選択する。（このHDDでは細かなパーティションが必要ない） 
+   領域番号[1] 一つ目の領域の場合
+   シリンダ始点「0」（初めから）
+   シリンダ終点「表示されるMAX」（最後まで）
+
+   「l」でHDDの用途の設定値を確認
+   「t」で用途設定モードに入る
+   lvmで使用するので「8e(linux lvm)」を指定   
+
+   「w」で設定値をHDDにの書きこむ
+   
+   fdiskでパーティションが切れていれば成功 
+   
+■ 物理ディスクを仮想ディスクとして認識させる。
+ pvcreate /dev/sdb1(切ったパーティション)
+
+ pvs で作成した簡易表示
+ pvdisplay で全容
+
+■ pvを束ねてvgを作成する
+ vgcreate [グループ名] [メンバにするpv名]
+ vgcreate storage /dev/sdb1
+
+ vgs で作成した簡易表示
+ vgdisplay で全容
+
+■vg上にlvを切る
+ lvcreate -l num -n [切った後の名前] --size num [切るvg]
+ 
+ サイズ指定が必要
+ -l  pvdisplayで確認できる[Total PE]いないの数値
+ --size 直接指定 → --size 1G
+ どちらか一つ使用する
+ 
+ ( pvはPEという単位で管理される )
+ ( pvdisplayで確認できるPE sizeはPE一つあたりのサイズ )
+ ( Total PE は格納できるPE数 よって PE size * Total PEがPVのサイズ )」 
+ 
+■lvにファイルシステムを適用する
+
+mkfs.ext4 /dev/storage/ssmix
+
+mount -t exm4t /dev/storage/ssmix /storage
+
+/etc/fstabに書いておく
+/dev/storage/ssmix /storage ext4 default 1 2
+
+ribootしてdfコマンドでマウントしていることを確認
+
+以上
